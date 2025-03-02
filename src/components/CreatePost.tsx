@@ -9,6 +9,8 @@ import { ImageIcon, Loader2Icon, SendIcon } from "lucide-react";
 import { Button } from "./ui/button";
 import { createPost } from "@/actions/post.action";
 import toast from "react-hot-toast";
+import MentionInput from "./MentionInput";
+import { processMentions } from "@/actions/mention.action";
 
 
 function CreatePost() {
@@ -20,16 +22,25 @@ function CreatePost() {
 
   const handleSubmit = async () => {
     if (!content.trim() && !imageUrl) return;
-
+  
     setIsPosting(true);
     try {
       const result = await createPost(content, imageUrl);
       if (result?.success) {
+        // Process mentions after post is created
+        if (result.post && content.includes('@')) {
+          await processMentions({
+            content,
+            postId: result.post.id,
+            authorId: result.post.authorId
+          });
+        }
+        
         // reset the form
         setContent("");
         setImageUrl("");
         setShowImageUpload(false);
-
+  
         toast.success("Post created successfully");
       }
     } catch (error) {
@@ -48,6 +59,12 @@ function CreatePost() {
             <Avatar className="w-10 h-10">
               <AvatarImage src={user?.imageUrl || "/avatar.png"} />
             </Avatar>
+            <MentionInput
+              value={content}
+              onChange={setContent}
+              className="min-h-[100px] resize-none border-none focus-visible:ring-0 p-0 text-base"
+              placeholder="What's on your mind?"
+            />
             <Textarea
               placeholder="What's on your mind?"
               className="min-h-[100px] resize-none border-none focus-visible:ring-0 p-0 text-base"

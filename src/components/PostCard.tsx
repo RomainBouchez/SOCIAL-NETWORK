@@ -12,6 +12,9 @@ import { DeleteAlertDialog } from "./DeleteAlertDialog";
 import { Button } from "./ui/button";
 import { HeartIcon, LogInIcon, MessageCircleIcon, SendIcon } from "lucide-react";
 import { Textarea } from "./ui/textarea";
+import MentionInput from "./MentionInput";
+import { formatTextWithMentions } from "@/lib/formatText";
+import { processMentions } from "@/actions/mention.action";
 
 type Posts = Awaited<ReturnType<typeof getPosts>>;
 type Post = Posts[number];
@@ -46,11 +49,28 @@ function PostCard({ post, dbUserId }: { post: Post; dbUserId: string | null }) {
     try {
       setIsCommenting(true);
       const result = await createComment(post.id, newComment);
-      if (result?.success) {
+      
+      console.log("Comment creation result:", result);
+      
+      if (result?.success && result.comment) {
+        // Process mentions if present
+        if (newComment.includes('@')) {
+          // The authorId is already set correctly in the comment
+          await processMentions({
+            content: newComment,
+            commentId: result.comment.id,
+            authorId: result.comment.authorId, // Use the authorId from the created comment
+          });
+        }
+        
         toast.success("Comment posted successfully");
         setNewComment("");
+      } else {
+        console.error("Failed to create comment:", result?.error);
+        toast.error(result?.error || "Failed to add comment");
       }
     } catch (error) {
+      console.error("Error in handleAddComment:", error);
       toast.error("Failed to add comment");
     } finally {
       setIsCommenting(false);
@@ -103,7 +123,9 @@ function PostCard({ post, dbUserId }: { post: Post; dbUserId: string | null }) {
                   <DeleteAlertDialog isDeleting={isDeleting} onDelete={handleDeletePost} />
                 )}
               </div>
-              <p className="mt-2 text-sm text-foreground break-words">{post.content}</p>
+              <p className="mt-2 text-sm text-foreground break-words">
+                {formatTextWithMentions(post.content)}
+              </p>
             </div>
           </div>
 
@@ -175,7 +197,9 @@ function PostCard({ post, dbUserId }: { post: Post; dbUserId: string | null }) {
                           {formatDistanceToNow(new Date(comment.createdAt))} ago
                         </span>
                       </div>
-                      <p className="text-sm break-words">{comment.content}</p>
+                      <p className="text-sm break-words">
+                        {formatTextWithMentions(comment.content)}
+                      </p>
                     </div>
                   </div>
                 ))}
@@ -187,11 +211,11 @@ function PostCard({ post, dbUserId }: { post: Post; dbUserId: string | null }) {
                     <AvatarImage src={user?.imageUrl || "/avatar.png"} />
                   </Avatar>
                   <div className="flex-1">
-                    <Textarea
-                      placeholder="Write a comment..."
+                    <MentionInput
                       value={newComment}
-                      onChange={(e) => setNewComment(e.target.value)}
+                      onChange={setNewComment}
                       className="min-h-[80px] resize-none"
+                      placeholder="Write a comment..."
                     />
                     <div className="flex justify-end mt-2">
                       <Button

@@ -107,6 +107,35 @@ export async function getRandomUsers() {
   }
 }
 
+export async function getUserFollowing() {
+  try {
+    const userId = await getDbUserId();
+    if (!userId) return [];
+    
+    const following = await prisma.follows.findMany({
+      where: {
+        followerId: userId,
+      },
+      include: {
+        following: {
+          select: {
+            id: true,
+            username: true,
+            name: true,
+            image: true,
+          },
+        },
+      },
+    });
+    
+    // Return the users this user is following
+    return following.map(follow => follow.following);
+  } catch (error) {
+    console.error("Error fetching following users:", error);
+    return [];
+  }
+}
+
 export async function toggleFollow(targetUserId: string) {
   try {
     const userId = await getDbUserId();

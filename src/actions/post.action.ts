@@ -145,7 +145,7 @@ export async function createComment(postId: string, content: string) {
   try {
     const userId = await getDbUserId();
 
-    if (!userId) return;
+    if (!userId) return { success: false, error: "Not authenticated" };
     if (!content) throw new Error("Content is required");
 
     const post = await prisma.post.findUnique({
@@ -183,10 +183,87 @@ export async function createComment(postId: string, content: string) {
     });
 
     revalidatePath(`/`);
+    // Make sure we're returning the comment correctly
     return { success: true, comment };
   } catch (error) {
     console.error("Failed to create comment:", error);
     return { success: false, error: "Failed to create comment" };
+  }
+}
+
+export async function processMentions({
+  content,
+  postId = null,
+  commentId = null,
+  authorId,
+}: {
+  content: string;
+  postId?: string | null;
+  commentId?: string | null;
+  authorId: string;
+}) {
+  try {
+    console.log("Processing mentions with:", {
+      content,
+      postId,
+      commentId,
+      authorId
+    });
+    
+    // Extract all @username mentions from the content
+    const mentionRegex = /@(\w+)/g;
+    const mentionMatches = [...content.matchAll(mentionRegex)];
+    const usernames = mentionMatches.map(match => match[1]);
+    
+    console.log("Found usernames:", usernames);
+    
+    if (usernames.length === 0) return { success: true };
+    
+    // Find all mentioned users that exist
+    const mentionedUsers = await prisma.user.findMany({
+      where: {
+        username: {
+          in: usernames,
+        },
+      },
+      select: {
+        id: true,
+        username: true,
+      },
+    });
+    
+    console.log("Found mentioned users:", mentionedUsers);
+    
+    if (mentionedUsers.length === 0) return { success: true };
+    
+    // Create notifications for mentions
+    for (const user of mentionedUsers) {
+      // Skip if user is mentioning themselves
+      if (user.id === authorId) {
+        console.log("Skipping self-mention for user:", user.username);
+        continue;
+      }
+      
+      console.log("Creating notification for user:", user.username);
+      
+      // Create notification
+      const notification = await prisma.notification.create({
+        data: {
+          type: "MENTION",
+          userId: user.id, // who receives the notification
+          creatorId: authorId, // who created the mention
+          postId,
+          commentId,
+        },
+      });
+      
+      console.log("Created notification:", notification);
+    }
+    
+    return { success: true };
+  } catch (error) {
+    console.error("Error processing mentions:", error);
+    return { success: false, error: "Failed to process mentions" };
   }
 }
 
