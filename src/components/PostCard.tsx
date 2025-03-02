@@ -15,11 +15,15 @@ import { Textarea } from "./ui/textarea";
 import MentionInput from "./MentionInput";
 import { formatTextWithMentions } from "@/lib/formatText";
 import { processMentions } from "@/actions/mention.action";
+import { usePathname } from "next/navigation";
+
 
 type Posts = Awaited<ReturnType<typeof getPosts>>;
 type Post = Posts[number];
 
 function PostCard({ post, dbUserId }: { post: Post; dbUserId: string | null }) {
+  const pathname = usePathname();
+  const isPostPage = pathname.startsWith("/post/");
   const { user } = useUser();
   const [newComment, setNewComment] = useState("");
   const [isCommenting, setIsCommenting] = useState(false);
@@ -27,7 +31,8 @@ function PostCard({ post, dbUserId }: { post: Post; dbUserId: string | null }) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [hasLiked, setHasLiked] = useState(post.likes.some((like) => like.userId === dbUserId));
   const [optimisticLikes, setOptmisticLikes] = useState(post._count.likes);
-  const [showComments, setShowComments] = useState(false);
+  const [showComments, setShowComments] = useState(isPostPage);
+  
 
   const handleLike = async () => {
     if (isLiking) return;
@@ -50,16 +55,14 @@ function PostCard({ post, dbUserId }: { post: Post; dbUserId: string | null }) {
       setIsCommenting(true);
       const result = await createComment(post.id, newComment);
       
-      console.log("Comment creation result:", result);
-      
       if (result?.success && result.comment) {
         // Process mentions if present
         if (newComment.includes('@')) {
-          // The authorId is already set correctly in the comment
           await processMentions({
             content: newComment,
+            postId: post.id,
             commentId: result.comment.id,
-            authorId: result.comment.authorId, // Use the authorId from the created comment
+            authorId: result.comment.authorId
           });
         }
         
@@ -254,3 +257,10 @@ function PostCard({ post, dbUserId }: { post: Post; dbUserId: string | null }) {
   );
 }
 export default PostCard;
+function processMENTIONS(arg0: {
+  content: string; postId: string; // Include postId as context
+  commentId: string; authorId: string;
+}) {
+  throw new Error("Function not implemented.");
+}
+

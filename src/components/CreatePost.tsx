@@ -10,8 +10,8 @@ import { Button } from "./ui/button";
 import { createPost } from "@/actions/post.action";
 import toast from "react-hot-toast";
 import MentionInput from "./MentionInput";
-import { processMentions } from "@/actions/mention.action";
-
+import { processMentions } from "@/actions/mention.action"; // Import the correct function
+import ImageUpload from "./ImageUpload";
 
 function CreatePost() {
   const { user } = useUser();
@@ -65,18 +65,18 @@ function CreatePost() {
               className="min-h-[100px] resize-none border-none focus-visible:ring-0 p-0 text-base"
               placeholder="What's on your mind?"
             />
-            <Textarea
-              placeholder="What's on your mind?"
-              className="min-h-[100px] resize-none border-none focus-visible:ring-0 p-0 text-base"
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              disabled={isPosting}
-            />
           </div>
 
           {(showImageUpload || imageUrl) && (
-            <div className="border rounded-lg p-4">
-              
+            <div className="border border-border rounded-lg p-4 bg-card/30">
+              <ImageUpload
+                endpoint="postImage"
+                value={imageUrl}
+                onChange={(url) => {
+                  setImageUrl(url);
+                  if (!url) setShowImageUpload(false);
+                }}
+              />
             </div>
           )}
 

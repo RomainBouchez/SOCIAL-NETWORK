@@ -3,6 +3,8 @@
 import prisma from "@/lib/prisma";
 import { getDbUserId } from "./user.action";
 import { revalidatePath } from "next/cache";
+import { NotificationType } from "@prisma/client"; // Import the enum type
+import { processMentions } from "@/actions/mention.action"; // Import the processMentions function
 
 export async function createPost(content: string, image: string) {
   try {
@@ -122,7 +124,7 @@ export async function toggleLike(postId: string) {
           ? [
               prisma.notification.create({
                 data: {
-                  type: "LIKE",
+                  type: NotificationType.LIKE, // Use the enum value
                   userId: post.authorId, // recipient (post author)
                   creatorId: userId, // person who liked
                   postId,
@@ -170,7 +172,7 @@ export async function createComment(postId: string, content: string) {
       if (post.authorId !== userId) {
         await tx.notification.create({
           data: {
-            type: "COMMENT",
+            type: NotificationType.COMMENT, // Use the enum value
             userId: post.authorId,
             creatorId: userId,
             postId,
@@ -188,82 +190,6 @@ export async function createComment(postId: string, content: string) {
   } catch (error) {
     console.error("Failed to create comment:", error);
     return { success: false, error: "Failed to create comment" };
-  }
-}
-
-export async function processMentions({
-  content,
-  postId = null,
-  commentId = null,
-  authorId,
-}: {
-  content: string;
-  postId?: string | null;
-  commentId?: string | null;
-  authorId: string;
-}) {
-  try {
-    console.log("Processing mentions with:", {
-      content,
-      postId,
-      commentId,
-      authorId
-    });
-    
-    // Extract all @username mentions from the content
-    const mentionRegex = /@(\w+)/g;
-    const mentionMatches = [...content.matchAll(mentionRegex)];
-    const usernames = mentionMatches.map(match => match[1]);
-    
-    console.log("Found usernames:", usernames);
-    
-    if (usernames.length === 0) return { success: true };
-    
-    // Find all mentioned users that exist
-    const mentionedUsers = await prisma.user.findMany({
-      where: {
-        username: {
-          in: usernames,
-        },
-      },
-      select: {
-        id: true,
-        username: true,
-      },
-    });
-    
-    console.log("Found mentioned users:", mentionedUsers);
-    
-    if (mentionedUsers.length === 0) return { success: true };
-    
-    // Create notifications for mentions
-    for (const user of mentionedUsers) {
-      // Skip if user is mentioning themselves
-      if (user.id === authorId) {
-        console.log("Skipping self-mention for user:", user.username);
-        continue;
-      }
-      
-      console.log("Creating notification for user:", user.username);
-      
-      // Create notification
-      const notification = await prisma.notification.create({
-        data: {
-          type: "MENTION",
-          userId: user.id, // who receives the notification
-          creatorId: authorId, // who created the mention
-          postId,
-          commentId,
-        },
-      });
-      
-      console.log("Created notification:", notification);
-    }
-    
-    return { success: true };
-  } catch (error) {
-    console.error("Error processing mentions:", error);
-    return { success: false, error: "Failed to process mentions" };
   }
 }
 
@@ -288,5 +214,54 @@ export async function deletePost(postId: string) {
   } catch (error) {
     console.error("Failed to delete post:", error);
     return { success: false, error: "Failed to delete post" };
+  }
+}
+
+export async function getSinglePost(id: string) {
+  try {
+    const post = await prisma.post.findUnique({
+      where: { id },
+      include: {
+        author: {
+          select: {
+            id: true,
+            name: true,
+            image: true,
+            username: true,
+          },
+        },
+        comments: {
+          include: {
+            author: {
+              select: {
+                id: true,
+                username: true,
+                image: true,
+                name: true,
+              },
+            },
+          },
+          orderBy: {
+            createdAt: "asc",
+          },
+        },
+        likes: {
+          select: {
+            userId: true,
+          },
+        },
+        _count: {
+          select: {
+            likes: true,
+            comments: true,
+          },
+        },
+      },
+    });
+
+    return post;
+  } catch (error) {
+    console.error("Error fetching post:", error);
+    return null;
   }
 }

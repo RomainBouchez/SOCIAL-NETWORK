@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import toast from "react-hot-toast";
+import UserListsModal from "@/components/UserListsModal";
 
 type User = Awaited<ReturnType<typeof getProfileByUsername>>;
 type Posts = Awaited<ReturnType<typeof getUserPosts>>;
@@ -51,6 +52,8 @@ function ProfilePageClient({
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [isFollowing, setIsFollowing] = useState(initialIsFollowing);
   const [isUpdatingFollow, setIsUpdatingFollow] = useState(false);
+  const [showUserListsModal, setShowUserListsModal] = useState(false);
+  const [userListsModalTab, setUserListsModalTab] = useState<"followers" | "following">("followers");
 
   const [editForm, setEditForm] = useState({
     name: user.name || "",
@@ -92,6 +95,11 @@ function ProfilePageClient({
 
   const formattedDate = format(new Date(user.createdAt), "MMMM yyyy");
 
+  const openUserListsModal = (tab: "followers" | "following") => {
+    setUserListsModalTab(tab);
+    setShowUserListsModal(true);
+  };
+
   return (
     <div className="max-w-3xl mx-auto">
       <div className="grid grid-cols-1 gap-6">
@@ -109,12 +117,18 @@ function ProfilePageClient({
                 {/* PROFILE STATS */}
                 <div className="w-full mt-6">
                   <div className="flex justify-between mb-4">
-                    <div>
+                    <div 
+                      className="cursor-pointer hover:text-primary transition-colors" 
+                      onClick={() => openUserListsModal("following")}
+                    >
                       <div className="font-semibold">{user._count.following.toLocaleString()}</div>
                       <div className="text-sm text-muted-foreground">Following</div>
                     </div>
                     <Separator orientation="vertical" />
-                    <div>
+                    <div 
+                      className="cursor-pointer hover:text-primary transition-colors" 
+                      onClick={() => openUserListsModal("followers")}
+                    >
                       <div className="font-semibold">{user._count.followers.toLocaleString()}</div>
                       <div className="text-sm text-muted-foreground">Followers</div>
                     </div>
@@ -221,6 +235,18 @@ function ProfilePageClient({
           </TabsContent>
         </Tabs>
 
+        {/* USER LISTS MODAL */}
+        <UserListsModal
+          userId={user.id}
+          username={user.username}
+          initialTab={userListsModalTab}
+          followersCount={user._count.followers}
+          followingCount={user._count.following}
+          open={showUserListsModal}
+          onOpenChange={setShowUserListsModal}
+        />
+
+        {/* EDIT PROFILE DIALOG */}
         <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
           <DialogContent className="sm:max-w-[500px]">
             <DialogHeader>
